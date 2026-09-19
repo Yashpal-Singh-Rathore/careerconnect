@@ -1,6 +1,7 @@
 # CareerConnect
 
-CareerConnect is a full-stack web application designed for students and employers.
+CareerConnect is a full-stack web application designed for students and
+employers.
 
 ## Project Structure
 
@@ -50,13 +51,13 @@ career_connect/
    ```
 3. Configure environment variables in `server/.env`:
    ```env
-   PORT=5001
-   DB_HOST=localhost
-   DB_USER=root
-   DB_PASSWORD=
-   DB_NAME=career_connect
-   JWT_SECRET=career_connect_jwt_super_secret_key_2026
-   CLIENT_URL=http://localhost:5173
+    PORT=5001
+    DB_HOST=localhost
+    DB_USER=your_database_user
+    DB_PASSWORD=your_database_password
+    DB_NAME=career_connect
+    JWT_SECRET=your_secure_jwt_secret
+    CLIENT_URL=http://localhost:5173
    ```
 4. Start the backend server:
    - For development (with auto-reload):
@@ -96,13 +97,15 @@ career_connect/
 
 ### Verifying the Backend API Health
 
-With the backend running, test the health check endpoint using `curl` or in your browser:
+With the backend running, test the health check endpoint using `curl` or in your
+browser:
 
 ```bash
 curl http://localhost:5001/api/health
 ```
 
 Expected response:
+
 ```json
 {
   "success": true,
