@@ -76,3 +76,95 @@ jobs:
       - name: Build Frontend Application
         working-directory: client
         run: npm run build
+
+  deploy:
+    name: Deploy to Oracle VM
+    runs-on: ubuntu-latest
+    needs: [backend-tests, frontend-build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    steps:
+      - name: Setup SSH Authentication
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.ORACLE_SSH_KEY }}
+          SSH_HOST: ${{ secrets.ORACLE_HOST }}
+          SSH_PORT: ${{ secrets.ORACLE_PORT || '22' }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/oracle_deploy_key
+          chmod 600 ~/.ssh/oracle_deploy_key
+          ssh-keyscan -p "$SSH_PORT" "$SSH_HOST" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Execute Remote Deployment
+        env:
+          SSH_USER: ${{ secrets.ORACLE_USER }}
+          SSH_HOST: ${{ secrets.ORACLE_HOST }}
+          SSH_PORT: ${{ secrets.ORACLE_PORT || '22' }}
+        run: |
+          ssh -i ~/.ssh/oracle_deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" 'bash -s' << 'EOF'
+            set -euo pipefail
+
+            echo "=== 1. Navigating to Application Directory ==="
+            cd /home/ubuntu/careerconnect
+
+            echo "=== 2. Ensuring Repository is on main ==="
+            git checkout main
+
+            echo "=== 3. Fetching Latest Changes from origin/main ==="
+            git fetch origin main
+
+            echo "=== 4. Resetting Tracked Files to origin/main ==="
+            git reset --hard origin/main
+
+            echo "=== 5. Verifying Production Environment Configuration ==="
+            if [ ! -f "/home/ubuntu/careerconnect/server/.env" ]; then
+              echo "CRITICAL ERROR: /home/ubuntu/careerconnect/server/.env does not exist!"
+              exit 1
+            fi
+
+            echo "=== 6. Ensuring Resume Upload Directory Exists ==="
+            mkdir -p /home/ubuntu/careerconnect/server/uploads/resumes/
+
+            echo "=== 7. Installing Production Backend Dependencies ==="
+            cd /home/ubuntu/careerconnect/server
+            npm ci --omit=dev
+
+            echo "=== 8. Installing Frontend Dependencies ==="
+            cd /home/ubuntu/careerconnect/client
+            npm ci
+
+            echo "=== 9. Building Production Frontend Bundle ==="
+            VITE_API_URL=/api npm run build
+
+            echo "=== 10. Deploying Static Frontend to Nginx Web Root ==="
+            sudo rm -rf /var/www/careerconnect/*
+            sudo cp -r dist/* /var/www/careerconnect/
+
+            echo "=== 11. Validating Nginx Configuration ==="
+            sudo nginx -t
+
+            echo "=== 12. Reloading Backend Process via PM2 ==="
+            pm2 reload careerconnect || pm2 restart careerconnect
+
+            echo "=== 13. Verifying PM2 Status ==="
+            pm2 status careerconnect
+
+            echo "=== 14. Internal Backend Health Check ==="
+            curl -fsS http://127.0.0.1:5001/api/health
+            echo ""
+            echo "Internal health check PASSED."
+          EOF
+
+      - name: Verify Public HTTPS Health Check
+        run: |
+          echo "=== 15. Verifying Public Production Endpoint ==="
+          curl -fsS https://careerconnect.yashpal.live/api/health
+          echo ""
+          echo "Public production health check PASSED."
+
+      - name: Cleanup SSH Credentials
+        if: always()
+        run: |
+          rm -f ~/.ssh/oracle_deploy_key
