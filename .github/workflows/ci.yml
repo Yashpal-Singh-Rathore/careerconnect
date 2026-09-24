@@ -106,6 +106,9 @@ jobs:
           ssh -i ~/.ssh/oracle_deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" 'bash -s' << 'EOF'
             set -euo pipefail
 
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+
             echo "=== 1. Navigating to Application Directory ==="
             cd /home/ubuntu/careerconnect
 
