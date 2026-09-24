@@ -1,0 +1,78 @@
+name: CareerConnect CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  backend-tests:
+    name: Backend Regression Tests
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: career_connect_test
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping -h 127.0.0.1 -u root --password=root" --health-interval 10s --health-timeout 5s --health-retries 5
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+          cache-dependency-path: server/package-lock.json
+
+      - name: Initialize Database Schema
+        run: |
+          mysql -h 127.0.0.1 -u root -proot -e "CREATE DATABASE IF NOT EXISTS career_connect_test;"
+          sed 's/career_connect/career_connect_test/g' database/schema.sql | mysql -h 127.0.0.1 -u root -proot
+
+      - name: Install Server Dependencies
+        working-directory: server
+        run: npm ci
+
+      - name: Run Backend Tests
+        working-directory: server
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: root
+          DB_PASSWORD: root
+          DB_NAME: career_connect_test
+          JWT_SECRET: career_connect_ci_jwt_super_secret_key_2026
+        run: npm test
+
+  frontend-build:
+    name: Frontend Production Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install Client Dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Build Frontend Application
+        working-directory: client
+        run: npm run build
