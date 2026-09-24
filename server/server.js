@@ -177,8 +177,12 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Start server
+// Start server only when run directly
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-  console.log(`CareerConnect Server is running on port ${PORT}`);
-});
+if (require.main === module) {
+  server.listen(PORT, () => {
+    console.log(`CareerConnect Server is running on port ${PORT}`);
+  });
+}
+
+module.exports = { app, server, io };
