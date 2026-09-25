@@ -155,9 +155,22 @@ jobs:
             pm2 status careerconnect
 
             echo "=== 14. Internal Backend Health Check ==="
-            curl -fsS http://127.0.0.1:5001/api/health
-            echo ""
-            echo "Internal health check PASSED."
+            HEALTH_PASSED=false
+            for i in $(seq 1 15); do
+              if curl -fsS http://127.0.0.1:5001/api/health; then
+                HEALTH_PASSED=true
+                echo ""
+                echo "Internal health check PASSED on attempt $i."
+                break
+              fi
+              echo "Waiting for backend on port 5001 (attempt $i/15)..."
+              sleep 2
+            done
+
+            if [ "$HEALTH_PASSED" != "true" ]; then
+              echo "ERROR: Internal health check failed after 30 seconds."
+              exit 1
+            fi
           EOF
 
       - name: Verify Public HTTPS Health Check
